@@ -23,7 +23,7 @@ if __name__ == '__main__':
                 print("1970-01-01 open Expenses:" + account)
         elif key == "accounts":
             for account in mapping.values():
-                print("1970-01-01 open Expenses:" + account)
+                print("1970-01-01 open " + account)
             # add balance and pad for accounts
             time = datetime.datetime.now().strftime('%Y-%m-%d')
 
@@ -39,4 +39,3 @@ if __name__ == '__main__':
             if key != "tags":
                 for account in mapping.values():
                     print("1970-01-01 open " + account)
-

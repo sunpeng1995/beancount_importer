@@ -56,44 +56,44 @@ def build_records(mapping, record):
             return '"%s" %s' % (desc, beancount_tag)
         else:
             return '"%s"' % desc
-    name, _, account, transfers_to, description, category, date, _, amount, currency, _, tags = record
+    name, _, account, transfers_to, description, _, category, date, _, _, amount, currency, _ = record
 
     if name:
         # This record only contains the current balance in this account
         pass
     else:
-        time = datetime.datetime.strptime(date, "%m/%d/%Y")
+        time = datetime.datetime.strptime(date, "%Y/%d/%m")
         time = time.strftime('%Y-%m-%d')
         amount = locale.atof(amount)
         if transfers_to:
             # This is a transfer between accounts record
             if amount > 0:
                 # dedup the same transfer in different accounts
-                return COMMON_TEMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
+                return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
                     amount, currency, mapping['accounts'][transfers_to], amount, currency)
         else:
             if amount > 0 and "Refund" not in description and "退货" not in description and "退款" not in description:
                 # Income, refund is added to expenses
                 if category:
-                    return COMMON_TEMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
+                    return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
                         amount, currency, mapping['incomes'][category], amount, currency)
                 else:
                     # for new balance
-                    return COMMON_TEMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
+                    return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
                         amount, currency, "Income:Newbalance", amount, currency)
             else:
                 if amount < 0:
                     amount = abs(amount)
                     if category:
-                        return EXPENSES_TMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
+                        return EXPENSES_TMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
                             amount, currency, mapping['expenses'][category], amount, currency)
                     else:
                         # for new balance
-                        return COMMON_TEMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
-                            amount, currency, "Expenses:Newbalance", amount, currency)
+                        return COMMON_TEMPLATE % (time, description_and_tags(description, None), "Expenses:Newbalance", amount, currency, mapping['accounts'][account],
+                            amount, currency)
                 else:
                     # refund
-                    return EXPENSES_REFUND_TMPLATE % (time, description_and_tags(description, tags), mapping['accounts'][account], 
+                    return EXPENSES_REFUND_TMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
                             amount, currency, mapping['expenses'][category], amount, currency)
 
 
@@ -103,6 +103,7 @@ def print_records(mapping, records):
         if beancount_record:
             print(build_records(mapping, record))
 
+import sys
 
 if __name__ == '__main__':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -110,5 +111,6 @@ if __name__ == '__main__':
     locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
     mapping = load_json(path.join(os.path.dirname(os.path.realpath(__file__)), 'map.json'))
-    records = load_csv('../documents/moneywiz/201908report.csv', True)
+    moneywiz_csv_path = sys.argv[1]
+    records = load_csv(moneywiz_csv_path, True)
     print_records(mapping, records)
