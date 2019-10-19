@@ -83,7 +83,7 @@ def build_records(mapping, record):
                 else:
                     # for new balance
                     return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                        amount, currency, "Income:Newbalance", amount, currency)
+                        amount, currency, "Income:Other", amount, currency)
             else:
                 if amount < 0:
                     amount = abs(amount)
@@ -92,7 +92,7 @@ def build_records(mapping, record):
                             amount, currency, mapping['expenses'][category], amount, currency)
                     else:
                         # for new balance
-                        return COMMON_TEMPLATE % (time, description_and_tags(description, None), "Expenses:Newbalance", amount, currency, mapping['accounts'][account],
+                        return COMMON_TEMPLATE % (time, description_and_tags(description, None), "Expenses:Other", amount, currency, mapping['accounts'][account],
                             amount, currency)
                 else:
                     # refund
