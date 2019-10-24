@@ -85,7 +85,7 @@ def build_records(mapping, record):
                     amount = abs(amount)
                     if category:
                         if "押金" in category:
-                            return (time, COMMON_TEMPLATE % (description_and_tags(description, None), "", amount, currency, mapping['accounts'][account],
+                            return (time, COMMON_TEMPLATE % (description_and_tags(description, None), "Assets:Receivables:RentalDeposit", amount, currency, mapping['accounts'][account],
                             amount, currency))
                         cate = mapping['expenses'][category]
                         if "其他" in category:
@@ -157,5 +157,12 @@ if __name__ == '__main__':
     records = load_csv(moneywiz_csv_path, True)
     result = convert_records(mapping, records)
     result.sort(key=lambda r: r[0])
-    for time, s in result:
-        print(time.strftime("%Y-%m-%d") + s)
+    split = [0]
+    f = open("ledger/" + str(result[0][0].year) + "-" + str(result[0][0].month) + ".bean", "w", encoding="utf-8")
+    for index, item in enumerate(result):
+        if result[split[-1]][0].month != item[0].month:
+            split.append(index)
+            f.close()
+            f = open("ledger/" + str(result[split[-1]][0].year) + "-" + str(result[split[-1]][0].month) + ".bean", "w", encoding="utf-8")
+        f.write(item[0].strftime('%Y-%m-%d') + item[1])
+    f.close()
