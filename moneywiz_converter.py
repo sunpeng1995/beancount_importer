@@ -12,17 +12,17 @@ from os import path
 import locale
 
 
-EXPENSES_TMPLATE = """%s * %s
+EXPENSES_TMPLATE = """ * %s
     %s                 -%s %s
     Expenses:%s                 +%s %s
 """
 
-EXPENSES_REFUND_TMPLATE = """%s * %s
+EXPENSES_REFUND_TMPLATE = """ * %s
     %s                 +%s %s
     Expenses:%s                 -%s %s
 """
 
-COMMON_TEMPLATE = """%s * %s
+COMMON_TEMPLATE = """ * %s
     %s                 +%s %s
     %s                 -%s %s
 """
@@ -56,49 +56,79 @@ def build_records(mapping, record):
             return '"%s" %s' % (desc, beancount_tag)
         else:
             return '"%s"' % desc
-    name, _, account, transfers_to, description, _, category, date, _, _, amount, currency, _ = record
 
+    name, _, account, transfers_to, description, _, category, date, _, amount, currency, _, _ = record
     if name:
         # This record only contains the current balance in this account
         pass
     else:
-        time = datetime.datetime.strptime(date, "%Y/%d/%m")
-        time = time.strftime('%Y-%m-%d')
+        time = datetime.datetime.strptime(date, "%Y/%m/%d")
+        # time = time.strftime('%Y-%m-%d')
         amount = locale.atof(amount)
         if transfers_to:
             # This is a transfer between accounts record
             if amount > 0:
                 # dedup the same transfer in different accounts
-                return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                    amount, currency, mapping['accounts'][transfers_to], amount, currency)
+                return (time, COMMON_TEMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                    amount, currency, mapping['accounts'][transfers_to], amount, currency))
         else:
-            if amount > 0 and "Refund" not in description and "退货" not in description and "退款" not in description:
+            if amount > 0 and "退" not in description:
                 # Income, refund is added to expenses
                 if category:
-                    return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                        amount, currency, mapping['incomes'][category], amount, currency)
-                elif "红包" in description:
-                    return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                        amount, currency, "Income:RedEnvelope", amount, currency)
+                    return (time, COMMON_TEMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                        amount, currency, mapping['incomes'][category], amount, currency))
                 else:
-                    # for new balance
-                    return COMMON_TEMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                        amount, currency, "Income:Other", amount, currency)
+                    return (time, COMMON_TEMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                        amount, currency, "Income:Error", amount, currency))
             else:
                 if amount < 0:
                     amount = abs(amount)
                     if category:
-                        return EXPENSES_TMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                            amount, currency, mapping['expenses'][category], amount, currency)
+                        if "押金" in category:
+                            return (time, COMMON_TEMPLATE % (description_and_tags(description, None), "", amount, currency, mapping['accounts'][account],
+                            amount, currency))
+                        cate = mapping['expenses'][category]
+                        if "其他" in category:
+                            if "快递" in description:
+                                cate = "Comm:Express"
+                            elif "捐赠" in description or "筹" in description:
+                                cate = "Social:Donation"
+                            elif "红包" in description:
+                                cate = "Social:RedEnvelope"
+                            elif "互" in description:
+                                cate = "Insurance:Health"
+                            elif "信用卡保险" in description:
+                                cate = "Insurance:CreditCard"
+                            elif "手续" in description:
+                                cate = "Interest"
+                            else:
+                                cate = "Shopping:Groceries"
+                        elif "交通" in category:
+                            if "滴滴" in description or "出租车" in description:
+                                cate = "Transport:Taxi"
+                            elif "火车" in description:
+                                cate = "Transport:Train"
+                            elif "机票" in description:
+                                cate = "Transport:Aviation"
+                            elif "船" in description:
+                                cate = "Transport:Ferry"
+                            else:
+                                cate = "Transport:Public"
+                        return (time, EXPENSES_TMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                            amount, currency, cate, amount, currency))
                     else:
                         # for new balance
-                        return COMMON_TEMPLATE % (time, description_and_tags(description, None), "Expenses:Other", amount, currency, mapping['accounts'][account],
-                            amount, currency)
+                        return (time, COMMON_TEMPLATE % (description_and_tags(description, None), "Expenses:Error", amount, currency, mapping['accounts'][account],
+                            amount, currency))
                 else:
                     # refund
-                    return EXPENSES_REFUND_TMPLATE % (time, description_and_tags(description, None), mapping['accounts'][account],
-                            amount, currency, mapping['expenses'][category], amount, currency)
+                    if "押金" in category:
+                        return (time, COMMON_TEMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                                amount, currency, mapping["assets"]["房屋>押金"], amount, currency))
 
+                    cata = "Shopping:Groceries" if "其他" in category else mapping['expenses'][category]
+                    return (time, EXPENSES_REFUND_TMPLATE % (description_and_tags(description, None), mapping['accounts'][account],
+                            amount, currency, cata, amount, currency))
 
 def print_records(mapping, records):
     print('; transactions generated by moneywiz export CSV file via converting script https://github.com/ziyi-yan/beancount_importer/blob/master/moneywiz_converter.py')
@@ -106,6 +136,14 @@ def print_records(mapping, records):
         beancount_record = build_records(mapping, record)
         if beancount_record:
             print(build_records(mapping, record))
+
+def convert_records(mapping, records):
+    result = []
+    for record in records:
+        beancount_record = build_records(mapping, record)
+        if beancount_record:
+            result.append(beancount_record)
+    return result
 
 import sys
 
@@ -117,4 +155,7 @@ if __name__ == '__main__':
     mapping = load_json(path.join(os.path.dirname(os.path.realpath(__file__)), 'map.json'))
     moneywiz_csv_path = sys.argv[1]
     records = load_csv(moneywiz_csv_path, True)
-    print_records(mapping, records)
+    result = convert_records(mapping, records)
+    result.sort(key=lambda r: r[0])
+    for time, s in result:
+        print(time.strftime("%Y-%m-%d") + s)
